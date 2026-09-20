@@ -48,9 +48,26 @@ function BellIcon() {
 
 function CourseIcon({ type }: { type: string }) {
   if (type === "docker-mark") {
-    return <span className="docker-whale" aria-hidden="true"><i /><i /><i /><i /><i /></span>;
+    return (
+      <span className="docker-whale" aria-hidden="true">
+        <svg viewBox="0 0 88 78" role="presentation">
+          <path className="docker-body" d="M9 39h52c6 0 11-3 15-8 5 3 8 7 9 12-5 8-14 13-25 13H26C17 56 10 51 9 39Z" />
+          <path className="docker-neck" d="M61 38c2-8 7-12 14-13 2 2 3 5 3 8-4 1-7 3-9 7" />
+          <path className="docker-wave" d="M18 60c9 6 19 8 30 7 11-1 19-5 25-12" />
+          <rect x="18" y="26" width="9" height="9" rx="1" />
+          <rect x="30" y="26" width="9" height="9" rx="1" />
+          <rect x="42" y="26" width="9" height="9" rx="1" />
+          <rect x="30" y="15" width="9" height="9" rx="1" />
+          <rect x="42" y="15" width="9" height="9" rx="1" />
+        </svg>
+      </span>
+    );
   }
-  return <span className={`course-mark ${type}`} aria-hidden="true">{type === "next-mark" ? "N" : "TS"}</span>;
+  return (
+    <span className={`course-mark ${type}`} aria-hidden="true">
+      {type === "next-mark" ? <><b>N</b><i>JS</i></> : <><b>TS</b><i>type safe</i></>}
+    </span>
+  );
 }
 
 export default function Home() {

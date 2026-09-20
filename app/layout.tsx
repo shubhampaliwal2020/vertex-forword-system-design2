@@ -1,6 +1,13 @@
 import { ClerkProvider } from "@clerk/nextjs";
+import { Poppins } from "next/font/google";
 import type { Metadata } from "next";
 import "./globals.css";
+
+const poppins = Poppins({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+  variable: "--font-poppins",
+});
 
 export const metadata: Metadata = {
   title: "Vertex | Intelligent Learning",
@@ -9,7 +16,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="en" className="h-full antialiased">
+    <html lang="en" className={`h-full antialiased ${poppins.variable}`}>
       <body className="min-h-full flex flex-col">
         <ClerkProvider>
           {children}
