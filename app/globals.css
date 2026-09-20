@@ -29,6 +29,11 @@ button, a, input { -webkit-tap-highlight-color: transparent; }
 .main-nav a:hover, .section-heading a:hover { color: var(--orange); }
 .header-actions { display: flex; align-items: center; gap: 27px; margin-left: auto; }
 .icon-button { border: 0; background: transparent; padding: 8px; cursor: pointer; }
+.auth-link, .auth-button { border: 0; cursor: pointer; font: inherit; }
+.auth-link { color: var(--ink); background: transparent; padding: 10px 0; }
+.auth-button { padding: 11px 16px; border-radius: 8px; color: #fff; background: var(--orange); }
+.auth-link:hover { color: var(--orange); }
+.auth-button:hover { background: #e96845; }
 .bell-icon { display: block; width: 20px; height: 21px; border: 1.8px solid var(--ink); border-radius: 11px 11px 4px 4px; position: relative; }
 .bell-icon::before { content: ""; position: absolute; width: 25px; height: 1.8px; background: var(--ink); left: -4px; bottom: -3px; }
 .bell-icon::after { content: ""; position: absolute; width: 4px; height: 3px; border-radius: 50%; background: var(--ink); bottom: -7px; left: 7px; }
@@ -96,6 +101,8 @@ button, a, input { -webkit-tap-highlight-color: transparent; }
   .vertex-mark { width: 28px; height: 30px; font-size: 21px; }
   .main-nav { gap: 12px; font-size: 12px; }
   .header-actions { gap: 10px; }
+  .auth-link, .auth-button { font-size: 12px; }
+  .auth-button { padding: 9px 10px; }
   .bell-icon { transform: scale(.85); }
   .avatar { width: 40px; height: 40px; }
   .hero { padding: 48px 18px 35px; }

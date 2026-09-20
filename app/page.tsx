@@ -1,3 +1,5 @@
+import { SignInButton, SignUpButton, Show, UserButton } from "@clerk/nextjs";
+
 const courses = [
   {
     mark: "N",
@@ -62,7 +64,17 @@ export default function Home() {
         </nav>
         <div className="header-actions">
           <button className="icon-button" type="button" aria-label="Notifications"><BellIcon /></button>
-          <button className="avatar" type="button" aria-label="Open profile menu">A</button>
+          <Show when="signed-out">
+            <SignInButton mode="modal">
+              <button className="auth-link" type="button">Sign in</button>
+            </SignInButton>
+            <SignUpButton mode="modal">
+              <button className="auth-button" type="button">Get started</button>
+            </SignUpButton>
+          </Show>
+          <Show when="signed-in">
+            <UserButton />
+          </Show>
         </div>
       </header>
 
