@@ -47,7 +47,7 @@
       "source": "clerk/skills",
       "sourceType": "github",
       "skillPath": "skills/core/clerk-custom-ui/SKILL.md",
-      "computedHash": "fe5014e5155b83e074202cc9c97044e7b5cdc07e8116f7de2c93fcb4f8c4f787"
+      "computedHash": "27cea644237b0458967891474a3300d54cb4693bba19b964025c73a8ca035fb2"
     },
     "clerk-expo": {
       "source": "clerk/skills",

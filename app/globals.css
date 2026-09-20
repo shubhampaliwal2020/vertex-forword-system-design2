@@ -8,7 +8,7 @@
   --line: #eedfd8;
   --paper: #fffdfb;
   --display: Georgia, "Times New Roman", serif;
-  --ui: "Trebuchet MS", Arial, sans-serif;
+  --ui: var(--font-poppins), Poppins, Arial, sans-serif;
 }
 
 * { box-sizing: border-box; }
@@ -29,6 +29,11 @@ button, a, input { -webkit-tap-highlight-color: transparent; }
 .main-nav a:hover, .section-heading a:hover { color: var(--orange); }
 .header-actions { display: flex; align-items: center; gap: 27px; margin-left: auto; }
 .icon-button { border: 0; background: transparent; padding: 8px; cursor: pointer; }
+.auth-link, .auth-button { border: 0; cursor: pointer; font: inherit; }
+.auth-link { color: var(--ink); background: transparent; padding: 10px 0; }
+.auth-button { padding: 11px 16px; border-radius: 8px; color: #fff; background: var(--orange); }
+.auth-link:hover { color: var(--orange); }
+.auth-button:hover { background: #e96845; }
 .bell-icon { display: block; width: 20px; height: 21px; border: 1.8px solid var(--ink); border-radius: 11px 11px 4px 4px; position: relative; }
 .bell-icon::before { content: ""; position: absolute; width: 25px; height: 1.8px; background: var(--ink); left: -4px; bottom: -3px; }
 .bell-icon::after { content: ""; position: absolute; width: 4px; height: 3px; border-radius: 50%; background: var(--ink); bottom: -7px; left: 7px; }
@@ -57,13 +62,19 @@ button, a, input { -webkit-tap-highlight-color: transparent; }
 .course-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 23px; }
 .course-card { min-height: 373px; display: flex; flex-direction: column; padding: 32px 26px 22px; border: 1px solid var(--line); border-radius: 17px; background: #fff; transition: transform .2s ease, box-shadow .2s ease; }
 .course-card:hover { transform: translateY(-3px); box-shadow: 0 10px 20px #d7bdb01e; }
-.course-mark, .docker-whale { width: 73px; height: 73px; display: grid; place-items: center; border-radius: 11px; margin-bottom: 28px; }
-.next-mark { color: white; background: #101112; font: 500 50px/1 var(--display); }
-.typescript-mark { color: white; background: #397dcc; font: 700 34px/1 var(--ui); }
-.docker-whale { position: relative; background: transparent; margin-bottom: 28px; }
-.docker-whale::before { content: ""; position: absolute; width: 58px; height: 24px; bottom: 13px; left: 7px; border: 2px solid #111; border-radius: 4px 14px 14px 14px; background: #38a9ee; transform: skew(-8deg); }
-.docker-whale::after { content: ""; position: absolute; right: 0; bottom: 28px; width: 18px; height: 13px; border: 2px solid #111; border-radius: 50%; background: #38a9ee; }
-.docker-whale i { position: relative; z-index: 1; width: 9px; height: 9px; margin: 0 1px 22px; border: 1px solid #111; background: #168ed0; }
+.course-mark, .docker-whale { width: 78px; height: 78px; display: grid; place-items: center; border-radius: 14px; margin-bottom: 28px; overflow: hidden; }
+.next-mark { position: relative; color: white; background: #101112; font-family: var(--display); }
+.next-mark b { font-size: 52px; font-weight: 500; line-height: 1; }
+.next-mark i { position: absolute; right: 8px; bottom: 9px; color: #ff7653; font: 700 10px/1 var(--ui); letter-spacing: 1px; font-style: normal; }
+.typescript-mark { position: relative; color: white; background: linear-gradient(145deg, #397dcc, #2862b5); font-family: var(--ui); }
+.typescript-mark b { font-size: 31px; line-height: 1; }
+.typescript-mark i { position: absolute; right: 7px; bottom: 8px; color: #b9dbff; font: 500 7px/1 var(--ui); font-style: normal; }
+.docker-whale { background: #e8f7ff; border: 1px solid #c7eaff; }
+.docker-whale svg { width: 72px; height: 65px; overflow: visible; }
+.docker-whale rect { fill: #168ed0; stroke: #103b5a; stroke-width: 1.5; }
+.docker-body { fill: #38a9ee; stroke: #103b5a; stroke-width: 2; }
+.docker-neck { fill: #38a9ee; stroke: #103b5a; stroke-width: 2; }
+.docker-wave { fill: none; stroke: #103b5a; stroke-width: 2; stroke-linecap: round; }
 .course-card h3 { margin: 0 0 19px; font: 400 24px/1.1 var(--display); letter-spacing: -.8px; }
 .course-card > p { max-width: 270px; margin: 0; color: var(--muted); font-size: 15px; line-height: 1.65; }
 .course-meta { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: auto; padding-top: 20px; border-top: 1px solid var(--line); color: #4d5664; font-size: 11px; }
@@ -96,6 +107,8 @@ button, a, input { -webkit-tap-highlight-color: transparent; }
   .vertex-mark { width: 28px; height: 30px; font-size: 21px; }
   .main-nav { gap: 12px; font-size: 12px; }
   .header-actions { gap: 10px; }
+  .auth-link, .auth-button { font-size: 12px; }
+  .auth-button { padding: 9px 10px; }
   .bell-icon { transform: scale(.85); }
   .avatar { width: 40px; height: 40px; }
   .hero { padding: 48px 18px 35px; }
