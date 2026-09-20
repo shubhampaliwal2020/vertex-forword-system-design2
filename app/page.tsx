@@ -1,4 +1,5 @@
 import { SignInButton, SignUpButton, Show, UserButton } from "@clerk/nextjs";
+import { ArrowRight, Bell, Clock3, Gauge, Layers3, Search, Sparkles } from "lucide-react";
 
 const courses = [
   {
@@ -31,19 +32,7 @@ const courses = [
 ];
 
 function VertexMark() {
-  return <span className="vertex-mark" aria-hidden="true">V</span>;
-}
-
-function Arrow() {
-  return <span className="arrow" aria-hidden="true">&#8594;</span>;
-}
-
-function SearchIcon() {
-  return <span className="search-icon" aria-hidden="true" />;
-}
-
-function BellIcon() {
-  return <span className="bell-icon" aria-hidden="true" />;
+  return <Sparkles className="vertex-mark" aria-hidden="true" strokeWidth={2.4} />;
 }
 
 function CourseIcon({ type }: { type: string }) {
@@ -80,7 +69,7 @@ export default function Home() {
           <a href="#learning">My Learning</a>
         </nav>
         <div className="header-actions">
-          <button className="icon-button" type="button" aria-label="Notifications"><BellIcon /></button>
+          <button className="icon-button" type="button" aria-label="Notifications"><Bell size={20} strokeWidth={1.8} /></button>
           <Show when="signed-out">
             <SignInButton mode="modal">
               <button className="auth-link" type="button">Sign in</button>
@@ -99,16 +88,16 @@ export default function Home() {
         <p className="eyebrow">Intelligent learning</p>
         <h1 id="hero-title">Search your learning<br />in plain English.</h1>
         <p className="hero-copy">Vertex understands what you want to learn and<br className="desktop-only" /> finds the exact lessons across all your courses.</p>
-        <a className="primary-button" href="#courses">Explore Courses <Arrow /></a>
+        <a className="primary-button" href="#courses">Explore Courses <ArrowRight className="arrow" aria-hidden="true" /></a>
         <form className="search-box" role="search" action="#courses">
-          <SearchIcon />
+          <Search className="search-icon" aria-hidden="true" />
           <input aria-label="Search your learning" placeholder="Ask anything about your learning..." />
           <kbd><span aria-hidden="true">&#8984;</span> K</kbd>
         </form>
       </section>
 
       <section className="courses-section" id="courses" aria-labelledby="courses-title">
-        <div className="section-heading"><h2 id="courses-title">All Courses</h2><a href="#courses">View all courses <Arrow /></a></div>
+        <div className="section-heading"><h2 id="courses-title">All Courses</h2><a href="#courses">View all courses <ArrowRight className="arrow" aria-hidden="true" /></a></div>
         <div className="course-grid">
           {courses.map((course) => (
             <a className="course-card" href="#learning" key={course.title}>
@@ -116,9 +105,9 @@ export default function Home() {
               <h3>{course.title}</h3>
               <p>{course.description}</p>
               <div className="course-meta">
-                <span><i className="level-icon" aria-hidden="true" />{course.level}</span>
-                <span><i className="clock-icon" aria-hidden="true" />{course.duration}</span>
-                <span><i className="module-icon" aria-hidden="true" />{course.modules}</span>
+                <span><Gauge className="meta-icon" aria-hidden="true" />{course.level}</span>
+                <span><Clock3 className="meta-icon" aria-hidden="true" />{course.duration}</span>
+                <span><Layers3 className="meta-icon" aria-hidden="true" />{course.modules}</span>
               </div>
             </a>
           ))}
