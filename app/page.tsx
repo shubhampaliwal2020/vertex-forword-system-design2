@@ -1,37 +1,105 @@
-const primary = [["Primary 500","#F97316"],["Primary 400","#FB923C"],["Primary 300","#FDBA74"],["Primary 200","#FED7AA"],["Primary 100","#FFEEE5"]];
-const neutrals = [["Neutral 900","#0F172A"],["Neutral 700","#334155"],["Neutral 500","#64748B"],["Neutral 300","#CBD5E1"],["Neutral 200","#E2E8F0"],["Neutral 100","#F1F5F9"],["Neutral 50","#FAFAFC"],["White","#FFFFFF"]];
-const typeRows = [["Display 1","Playfair Display","48 / 56","Bold","Page titles"],["Display 2","Playfair Display","36 / 44","Bold","Section titles"],["Heading 1","Inter","28 / 36","Semi Bold","Card titles"],["Heading 2","Inter","22 / 30","Semi Bold","Sub section"],["Heading 3","Inter","18 / 24","Medium","Small titles"],["Body Large","Inter","16 / 24","Regular","Body copy"],["Body","Inter","14 / 20","Regular","Supporting text"],["Small","Inter","12 / 16","Regular","Captions, meta"]];
-const Icon = ({children}:{children:string}) => <span className="ds-icon" aria-hidden="true">{children}</span>;
-const Label = ({number,children}:{number:string;children:React.ReactNode}) => <p className="section-label"><span>{number}</span>{children}</p>;
-function Swatch({name,color}:{name:string;color:string}) { return <div className="swatch"><i style={{background:color}}/><b>{name}</b><small>{color}</small></div>; }
-function Button({variant,children,disabled}:{variant:string;children:React.ReactNode;disabled?:boolean}) { return <button className={`sample-button ${variant}`} disabled={disabled}>{children}</button>; }
+const courses = [
+  {
+    mark: "N",
+    markClass: "next-mark",
+    title: "Next.js for Production",
+    description: "Build scalable, high-performance web applications with Next.js.",
+    level: "Intermediate",
+    duration: "18h 24m",
+    modules: "12 modules",
+  },
+  {
+    mark: "docker",
+    markClass: "docker-mark",
+    title: "Docker Essentials",
+    description: "Containerize applications and streamline your development workflow.",
+    level: "Beginner",
+    duration: "10h 12m",
+    modules: "8 modules",
+  },
+  {
+    mark: "TS",
+    markClass: "typescript-mark",
+    title: "TypeScript Deep Dive",
+    description: "Go beyond the basics and write safer, more expressive code.",
+    level: "Intermediate",
+    duration: "14h 36m",
+    modules: "10 modules",
+  },
+];
+
+function VertexMark() {
+  return <span className="vertex-mark" aria-hidden="true">V</span>;
+}
+
+function Arrow() {
+  return <span className="arrow" aria-hidden="true">&#8594;</span>;
+}
+
+function SearchIcon() {
+  return <span className="search-icon" aria-hidden="true" />;
+}
+
+function BellIcon() {
+  return <span className="bell-icon" aria-hidden="true" />;
+}
+
+function CourseIcon({ type }: { type: string }) {
+  if (type === "docker-mark") {
+    return <span className="docker-whale" aria-hidden="true"><i /><i /><i /><i /><i /></span>;
+  }
+  return <span className={`course-mark ${type}`} aria-hidden="true">{type === "next-mark" ? "N" : "TS"}</span>;
+}
 
 export default function Home() {
-  return <main className="design-page">
-    <section className="design-grid hero-grid">
-      <div className="intro-panel"><div className="brand"><span className="brand-mark">▼</span><strong>Vertex</strong></div><h1>Design System</h1><p>A unified design language for Vertex learning platform. Clean, modern and focused on clarity, consistency and intuitive learning experiences.</p><small>VERSION 1.0 <i/> MAY 2025</small></div>
-      <section className="section-card colors-card"><Label number="01">Colors</Label><h2>Primary</h2><div className="swatches primary-swatches">{primary.map(([name,color])=><Swatch key={name} name={name} color={color}/>)}</div><h2>Neutral</h2><div className="swatches neutral-swatches">{neutrals.map(([name,color])=><Swatch key={name} name={name} color={color}/>)}</div></section>
-    </section>
-    <section className="design-grid type-grid">
-      <section className="section-card typography-card"><Label number="02">Typography</Label><div className="font-sample"><span className="display-sample">Ag</span><div><h2 className="serif">Playfair Display</h2><p>Elegant <i/> Readable <i/> Timeless</p></div></div><div className="font-sample"><span className="sans-sample">Ag</span><div><h2>Inter</h2><p>Clean <i/> Modern <i/> Highly legible</p></div></div></section>
-      <section className="section-card scale-card"><Label number="03">Type Scale</Label><div className="type-table"><div className="type-head"><span>Style</span><span>Font</span><span>Size / Line Height</span><span>Weight</span><span>Use</span></div>{typeRows.map(row=><div className="type-row" key={row[0]}>{row.map((cell,i)=><span key={cell} className={i===0?"type-style":""}>{cell}</span>)}</div>)}</div></section>
-    </section>
-    <section className="design-grid system-grid">
-      <section className="section-card spacing-card"><Label number="04">Spacing System</Label><h2>Base unit: 4px</h2><div className="spacing-samples">{[4,8,12,16,24,32,40,48,64].map(size=><div key={size}><i style={{width:Math.max(8,size),height:Math.max(8,size)}}/><b>{size}</b><small>({size/16}rem)</small></div>)}</div></section>
-      <section className="section-card radius-card"><Label number="05">Radius & Shadows</Label><h2>Radius</h2><div className="radius-samples">{[[4,"xs"],[8,"sm"],[12,"md"],[16,"lg"],[24,"xl"],[999,"circle"]].map(([size,name])=><div key={String(name)}><i style={{borderRadius:Number(size)}}/><b>{size===999?"Full":String(size)+"px"}</b><small>{size===999?"(circle)":"("+name+")"}</small></div>)}</div><h2>Shadows</h2><div className="shadow-samples">{[["Sm","0 1px 2px 0 rgba(15,23,42,.05)"],["Md","0 4px 12px -2px rgba(15,23,42,.08)"],["Lg","0 12px 24px -4px rgba(15,23,42,.10)"],["Xl","0 20px 40px -8px rgba(15,23,42,.12)"]].map(([name,shadow])=><div key={name} style={{boxShadow:shadow}}><b>{name}</b><small>{shadow}</small></div>)}</div></section>
-    </section>
-    <section className="design-grid controls-grid">
-      <section className="section-card icons-card"><Label number="06">Icons</Label><h2>Outline Style</h2><div className="icons-row">{["♧","⌕","⏵","▧","▱","▥","◷","♙","›"].map((x,i)=><Icon key={i}>{x}</Icon>)}</div><h2>Filled Style</h2><div className="icons-row filled">{["♟","●","▶","▣","▰","▦","●","♟","›"].map((x,i)=><Icon key={i}>{x}</Icon>)}</div><div className="mini-list"><p>• 24×24px grid</p><p>• 2px stroke width (outline)</p><p>• Rounded line caps</p><p>• Consistent optical balance</p></div></section>
-      <section className="section-card buttons-card"><Label number="07">Buttons</Label><div className="button-grid"><span>Primary</span><span>Secondary</span><span>Tertiary</span><span>Text</span>{["Default","Hover","Disabled"].map(state=><div className="button-set" key={state}><b>{state}</b><Button variant="primary" disabled={state==="Disabled"}>Get Started</Button><Button variant="secondary" disabled={state==="Disabled"}>Explore Courses</Button><Button variant="tertiary" disabled={state==="Disabled"}>View Lesson ↗</Button><Button variant="text" disabled={state==="Disabled"}>Watch Video&nbsp; ⏵</Button></div>)}</div><div className="mini-list button-specs"><p>• Height: 44px (default)</p><p>• Padding: 0 16px (lg), 0 12px (md)</p><p>• Radius: 12px</p><p>• Font: Inter Medium (14–16px)</p></div></section>
-      <section className="section-card inputs-card"><Label number="08">Inputs</Label><h2>Search / Text Input</h2><label className="input-sample"><Icon>⌕</Icon><input aria-label="Search anything" placeholder="Search anything..."/><kbd>⌘ K</kbd></label><h2>Select</h2><label className="select-sample"><select aria-label="Sort results" defaultValue="Most Relevant"><option>Most Relevant</option><option>Newest</option></select></label><div className="mini-list"><p>• Height: 44px</p><p>• Radius: 12px</p><p>• Border: 1px solid #E2E8F0</p><p>• Padding: 0 16px</p><p>• Focus: Border color #FB923C</p></div></section>
-    </section>
-    <section className="design-grid misc-grid">
-      <section className="section-card badges-card"><Label number="09">Badges / Tags</Label><div className="badges"><div><span>Video</span><b className="badge video">VIDEO</b></div><div><span>Lesson</span><b className="badge lesson">LESSON</b></div><div><span>Popular</span><b className="badge popular">POPULAR</b></div></div></section>
-      <section className="section-card status-card"><Label number="10">Status / Indicators</Label><div className="status-list"><span className="in-progress">◯ <b>In Progress</b></span><span className="complete">✓ <b>Completed</b></span><span className="playing">▶ <b>Now Playing</b></span><span>♧ <b>Locked</b></span></div></section>
-      <section className="section-card progress-card"><Label number="11">Progress Bar</Label><div className="progress-line"><i><b/></i><span><strong>35%</strong> complete</span></div></section>
-    </section>
-    <section className="section-card cards-card"><Label number="12">Cards</Label><div className="card-samples"><article className="course-card"><span className="course-logo">N</span><div><h2>Next.js for Production</h2><p>Build fast, high-performance web applications with Next.js.</p></div><footer>▥ &nbsp; Intermediate &nbsp;&nbsp; ◷ &nbsp; 18h 24m &nbsp;&nbsp; ▱ &nbsp; 12 modules</footer></article><article><b className="badge video">VIDEO</b><h2>Data Fetching in Server Components</h2><p>Learn how to fetch data on the server using async/await, just best practices.</p><footer>Lesson 5.1 &nbsp; · &nbsp; 12:45 <a>◉ Watch from 12:45</a></footer></article><article><b className="badge lesson">LESSON</b><h2>Data Fetching & Caching</h2><p>Explore different data fetching methods in Next.js and how to cache and revalidate data for optimal performance.</p><footer>Module 5 <a>View lesson ↗</a></footer></article><article className="resource-card"><span className="document">▧</span><div><h2>Caching and Revalidation Guide</h2><p>Deep dive into Next.js caching strategies.</p><footer>PDF &nbsp; · &nbsp; 1.2 MB</footer></div><a>↗</a></article></div></section>
-    <section className="section-card navigation-card"><Label number="13">Navigation</Label><div className="navigation-content"><div className="nav-brand"><span className="brand-mark">▼</span><strong>Vertex</strong><a className="active">Courses</a><a>My Learning</a></div><div className="breadcrumbs">All Courses <b>›</b> Next.js for Production <b>›</b> Data Fetching & Caching</div><div className="pagination">‹ <b>1</b> <span>2</span><span>3</span><span>…</span><span>8</span> ›</div></div></section>
-    <section className="section-card principles-card"><Label number="14">Principles</Label><div className="principles">{[["◉","Clarity First","Every element should communicate clearly."],["▦","Consistency","Use components and patterns consistently across the platform."],["◎","Focus & Calm","Remove noise and help learners focus on what matters."],["♙","Accessible","Design with accessibility and inclusivity in mind."]].map(([icon,title,text])=><article key={title}><Icon>{icon}</Icon><div><h2>{title}</h2><p>{text}</p></div></article>)}</div></section>
-  </main>;
+  return (
+    <main className="home-shell">
+      <header className="site-header">
+        <a className="brand" href="#top" aria-label="Vertex home"><VertexMark /><strong>Vertex</strong></a>
+        <nav className="main-nav" aria-label="Main navigation">
+          <a href="#courses">Courses</a>
+          <a href="#learning">My Learning</a>
+        </nav>
+        <div className="header-actions">
+          <button className="icon-button" type="button" aria-label="Notifications"><BellIcon /></button>
+          <button className="avatar" type="button" aria-label="Open profile menu">A</button>
+        </div>
+      </header>
+
+      <section className="hero" id="top" aria-labelledby="hero-title">
+        <p className="eyebrow">Intelligent learning</p>
+        <h1 id="hero-title">Search your learning<br />in plain English.</h1>
+        <p className="hero-copy">Vertex understands what you want to learn and<br className="desktop-only" /> finds the exact lessons across all your courses.</p>
+        <a className="primary-button" href="#courses">Explore Courses <Arrow /></a>
+        <form className="search-box" role="search" action="#courses">
+          <SearchIcon />
+          <input aria-label="Search your learning" placeholder="Ask anything about your learning..." />
+          <kbd><span aria-hidden="true">&#8984;</span> K</kbd>
+        </form>
+      </section>
+
+      <section className="courses-section" id="courses" aria-labelledby="courses-title">
+        <div className="section-heading"><h2 id="courses-title">All Courses</h2><a href="#courses">View all courses <Arrow /></a></div>
+        <div className="course-grid">
+          {courses.map((course) => (
+            <a className="course-card" href="#learning" key={course.title}>
+              <CourseIcon type={course.markClass} />
+              <h3>{course.title}</h3>
+              <p>{course.description}</p>
+              <div className="course-meta">
+                <span><i className="level-icon" aria-hidden="true" />{course.level}</span>
+                <span><i className="clock-icon" aria-hidden="true" />{course.duration}</span>
+                <span><i className="module-icon" aria-hidden="true" />{course.modules}</span>
+              </div>
+            </a>
+          ))}
+        </div>
+      </section>
+
+      <section className="announcement" id="learning" aria-label="Vertex update">
+        <span className="rule" /><p><span aria-hidden="true">☆</span> New courses and lessons added every week.</p><span className="rule" />
+      </section>
+      <div className="cityscape" aria-hidden="true"><i /><i /><i /><i /><i /><i /><i /><i /><i /><i /><i /><i /><i /><i /></div>
+    </main>
+  );
 }
