@@ -1,35 +1,8 @@
+import Link from "next/link";
 import { SignInButton, SignUpButton, Show, UserButton } from "@clerk/nextjs";
 import { ArrowRight, Bell, Clock3, Gauge, Layers3, Search, Sparkles } from "lucide-react";
-
-const courses = [
-  {
-    mark: "N",
-    markClass: "next-mark",
-    title: "Next.js for Production",
-    description: "Build scalable, high-performance web applications with Next.js.",
-    level: "Intermediate",
-    duration: "18h 24m",
-    modules: "12 modules",
-  },
-  {
-    mark: "docker",
-    markClass: "docker-mark",
-    title: "Docker Essentials",
-    description: "Containerize applications and streamline your development workflow.",
-    level: "Beginner",
-    duration: "10h 12m",
-    modules: "8 modules",
-  },
-  {
-    mark: "TS",
-    markClass: "typescript-mark",
-    title: "TypeScript Deep Dive",
-    description: "Go beyond the basics and write safer, more expressive code.",
-    level: "Intermediate",
-    duration: "14h 36m",
-    modules: "10 modules",
-  },
-];
+import { getCourses } from "../sanity/lib/data";
+import { fallbackCourses } from "./course/fallbackData";
 
 function VertexMark() {
   return <Sparkles className="vertex-mark" aria-hidden="true" strokeWidth={2.4} />;
@@ -59,7 +32,10 @@ function CourseIcon({ type }: { type: string }) {
   );
 }
 
-export default function Home() {
+export default async function Home() {
+  const coursesData = await getCourses();
+  const courses = coursesData.length ? coursesData : Object.values(fallbackCourses);
+
   return (
     <main className="home-shell">
       <header className="site-header">
@@ -99,18 +75,27 @@ export default function Home() {
       <section className="courses-section" id="courses" aria-labelledby="courses-title">
         <div className="section-heading"><h2 id="courses-title">All Courses</h2><a href="#courses">View all courses <ArrowRight className="arrow" aria-hidden="true" /></a></div>
         <div className="course-grid">
-          {courses.map((course) => (
-            <a className="course-card" href="#learning" key={course.title}>
-              <CourseIcon type={course.markClass} />
-              <h3>{course.title}</h3>
-              <p>{course.description}</p>
-              <div className="course-meta">
-                <span><Gauge className="meta-icon" aria-hidden="true" />{course.level}</span>
-                <span><Clock3 className="meta-icon" aria-hidden="true" />{course.duration}</span>
-                <span><Layers3 className="meta-icon" aria-hidden="true" />{course.modules}</span>
-              </div>
-            </a>
-          ))}
+          {courses.map((course, index) => {
+            const slug = course.slug?.current ?? `course-${index + 1}`;
+            const type = index === 1 ? "docker-mark" : index === 2 ? "typescript-mark" : "next-mark";
+            const level = course.level ?? (index === 1 ? "Beginner" : "Intermediate");
+            const duration = course.duration ?? (index === 1 ? "10h 12m" : index === 2 ? "14h 36m" : "18h 24m");
+            const modulesCount = Array.isArray(course.modules) ? course.modules.length : 0;
+            const summary = course.summary ?? "Learn the core concepts and production patterns behind this course.";
+
+            return (
+              <Link className="course-card" href={`/course/${slug}`} key={slug}>
+                <CourseIcon type={type} />
+                <h3>{course.title}</h3>
+                <p>{summary}</p>
+                <div className="course-meta">
+                  <span><Gauge className="meta-icon" aria-hidden="true" />{level}</span>
+                  <span><Clock3 className="meta-icon" aria-hidden="true" />{duration}</span>
+                  <span><Layers3 className="meta-icon" aria-hidden="true" />{modulesCount || 1} modules</span>
+                </div>
+              </Link>
+            );
+          })}
         </div>
       </section>
 
