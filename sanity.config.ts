@@ -5,6 +5,7 @@
  */
 
 import {visionTool} from '@sanity/vision'
+import {createClient} from '@sanity/client'
 import {defineConfig} from 'sanity'
 import {structureTool} from 'sanity/structure'
 
@@ -17,6 +18,10 @@ export default defineConfig({
   basePath: '/studio',
   projectId,
   dataset,
+  unstable_clientFactory: (options) => {
+    const clientOptions = {...options, heartbeatTimeout: 300000}
+    return createClient(clientOptions)
+  },
   // Add and edit the content schema in the './sanity/schemaTypes' folder
   schema,
   plugins: [
