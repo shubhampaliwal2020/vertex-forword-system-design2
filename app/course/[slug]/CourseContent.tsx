@@ -5,6 +5,22 @@ import { ChevronDown, PlayCircle } from 'lucide-react'
 import { useState } from 'react'
 import type { ModuleSummary } from '../../../sanity/lib/data'
 
+function durationInMinutes(duration?: string | number) {
+  if (typeof duration === 'number') return Math.round(duration / 60)
+  if (!duration) return 0
+
+  const hours = duration.match(/(\d+)h/)?.[1]
+  const minutes = duration.match(/(\d+)m/)?.[1]
+  return (hours ? Number(hours) * 60 : 0) + (minutes ? Number(minutes) : 0)
+}
+
+function formatDuration(minutes: number) {
+  if (!minutes) return 'Lesson'
+  const hours = Math.floor(minutes / 60)
+  const remainingMinutes = minutes % 60
+  return hours ? `${hours}h ${remainingMinutes}m` : `${remainingMinutes}m`
+}
+
 type CourseContentProps = {
   modules: ModuleSummary[]
   courseId: string
@@ -39,6 +55,7 @@ export default function CourseContent({modules, courseId}: CourseContentProps) {
           const moduleKey = module._key ?? `${courseId}-${index}`
           const isExpanded = expandedModules.has(moduleKey)
           const lessons = module.lessons ?? []
+          const moduleDuration = formatDuration(lessons.reduce((total, lesson) => total + durationInMinutes(lesson.duration), 0))
 
           return (
             <div className={`module-item ${isExpanded ? 'expanded' : ''}`} key={moduleKey} role="listitem">
@@ -55,7 +72,7 @@ export default function CourseContent({modules, courseId}: CourseContentProps) {
                     <span className="module-title">{module.title}</span>
                     <span className="module-description">{module.summary}</span>
                   </span>
-                  <span className="module-duration">{lessons.length ? `${lessons.length} lessons` : '1 lesson'}</span>
+                  <span className="module-duration">{moduleDuration}</span>
                   <ChevronDown className="toggle-icon" aria-hidden="true" />
                 </button>
               </div>

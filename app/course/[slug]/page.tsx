@@ -1,6 +1,7 @@
 import Link from 'next/link'
-import { ArrowRight, Bell, Bookmark, Clock3, Gauge, Layers3, Sparkles } from 'lucide-react'
+import { ArrowRight, Bell, Bookmark, Clock3, Code2, Gauge, Layers3, Rocket, ShieldCheck, Sparkles, Workflow } from 'lucide-react'
 import { getCourseBySlug } from '../../../sanity/lib/data'
+import { urlFor } from '../../../sanity/lib/image'
 import CourseContent from './CourseContent'
 import { fallbackCourses } from '../fallbackData'
 
@@ -10,6 +11,14 @@ function VertexMark() {
 
 function OutcomeIcon({ type }: { type: string }) {
   const common = 'outcome-icon'
+
+  if (type === 'layers') return <Layers3 className={common} aria-hidden="true" />
+  if (type === 'workflow') return <Workflow className={common} aria-hidden="true" />
+  if (type === 'gauge') return <Gauge className={common} aria-hidden="true" />
+  if (type === 'rocket') return <Rocket className={common} aria-hidden="true" />
+  if (type === 'shield') return <ShieldCheck className={common} aria-hidden="true" />
+  if (type === 'code') return <Code2 className={common} aria-hidden="true" />
+  if (type === 'sparkles') return <Sparkles className={common} aria-hidden="true" />
 
   if (type === 'stack') {
     return <span className={`${common} stack`} aria-hidden="true"><span /><span /><span /></span>
@@ -34,9 +43,19 @@ export default async function CoursePage({ params }: { params: Promise<{ slug: s
   const moduleCount = Array.isArray(course.modules) ? course.modules.length : 0
   const studentText = course.studentCount ? `${course.studentCount.toLocaleString()} students` : '2.1k students'
   const outcomes = course.learningOutcomes ?? []
-  const lessons = Array.isArray(course.modules) && course.modules.length ? course.modules[0]?.lessons ?? [] : []
-  const firstLessonSlug = lessons[0]?.slug?.current ?? fallbackCourse.modules?.[0]?.lessons?.[0]?.slug.current ?? 'data-fetching-caching'
+  const firstLessonSlug = course.modules?.flatMap((module) => module.lessons ?? [])[0]?.slug?.current
+    ?? fallbackCourse.modules?.flatMap((module) => module.lessons ?? [])[0]?.slug.current
+    ?? 'data-fetching-caching'
   const courseMark = slug === 'docker-essentials' ? 'D' : slug === 'typescript-deep-dive' ? 'TS' : 'N'
+  const coverImageUrl = course.coverImage
+    ? (() => {
+        try {
+          return urlFor(course.coverImage as Parameters<typeof urlFor>[0]).width(1200).height(900).fit('crop').url()
+        } catch {
+          return null
+        }
+      })()
+    : null
 
   return (
     <main className="course-shell">
@@ -67,12 +86,12 @@ export default async function CoursePage({ params }: { params: Promise<{ slug: s
         </nav>
 
         <section className="course-hero">
-          <div className="course-hero-media">
-            <div className={`course-hero-mark course-mark-${slug}`}>{courseMark}</div>
+          <div className={`course-hero-media ${coverImageUrl ? 'has-cover-image' : ''}`} style={coverImageUrl ? { backgroundImage: `url(${coverImageUrl})` } : undefined}>
+            {!coverImageUrl && <div className={`course-hero-mark course-mark-${slug}`}>{courseMark}</div>}
           </div>
 
           <div className="course-hero-copy">
-            <span className="popular-badge">POPULAR</span>
+            {course.popular && <span className="popular-badge">POPULAR</span>}
             <h1>{course.title}</h1>
             <p>{course.summary}</p>
 

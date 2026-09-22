@@ -2,13 +2,18 @@ import Link from "next/link";
 import { SignInButton, SignUpButton, Show, UserButton } from "@clerk/nextjs";
 import { ArrowRight, Bell, Clock3, Gauge, Layers3, Search, Sparkles } from "lucide-react";
 import { getCourses } from "../sanity/lib/data";
+import { urlFor } from "../sanity/lib/image";
 import { fallbackCourses } from "./course/fallbackData";
 
 function VertexMark() {
   return <Sparkles className="vertex-mark" aria-hidden="true" strokeWidth={2.4} />;
 }
 
-function CourseIcon({ type }: { type: string }) {
+function CourseIcon({ type, imageUrl }: { type: string; imageUrl?: string | null }) {
+  if (imageUrl) {
+    return <span className="course-card-cover" style={{ backgroundImage: `url(${imageUrl})` }} aria-hidden="true" />;
+  }
+
   if (type === "docker-mark") {
     return (
       <span className="docker-whale" aria-hidden="true">
@@ -30,6 +35,32 @@ function CourseIcon({ type }: { type: string }) {
       {type === "next-mark" ? <><b>N</b><i>JS</i></> : <><b>TS</b><i>type safe</i></>}
     </span>
   );
+}
+
+function durationInMinutes(duration?: string | number) {
+  if (typeof duration === "number") return Math.round(duration / 60);
+  if (!duration) return 0;
+
+  const hours = duration.match(/(\d+)h/)?.[1];
+  const minutes = duration.match(/(\d+)m/)?.[1];
+  return (hours ? Number(hours) * 60 : 0) + (minutes ? Number(minutes) : 0);
+}
+
+function formatDuration(minutes: number) {
+  if (!minutes) return "Duration unavailable";
+  const hours = Math.floor(minutes / 60);
+  const remainingMinutes = minutes % 60;
+  return hours ? `${hours}h ${remainingMinutes}m` : `${remainingMinutes}m`;
+}
+
+function imageUrlFor(source: unknown) {
+  if (!source) return null;
+
+  try {
+    return urlFor(source as Parameters<typeof urlFor>[0]).width(640).height(360).fit("crop").url();
+  } catch {
+    return null;
+  }
 }
 
 export default async function Home() {
@@ -77,15 +108,18 @@ export default async function Home() {
         <div className="course-grid">
           {courses.map((course, index) => {
             const slug = course.slug?.current ?? `course-${index + 1}`;
-            const type = index === 1 ? "docker-mark" : index === 2 ? "typescript-mark" : "next-mark";
-            const level = course.level ?? (index === 1 ? "Beginner" : "Intermediate");
-            const duration = course.duration ?? (index === 1 ? "10h 12m" : index === 2 ? "14h 36m" : "18h 24m");
+            const type = slug.includes("docker") ? "docker-mark" : slug.includes("typescript") ? "typescript-mark" : "next-mark";
+            const level = course.level ?? "Level unavailable";
+            const duration = course.duration
+              ? typeof course.duration === "number" ? formatDuration(durationInMinutes(course.duration)) : course.duration
+              : formatDuration((course.modules ?? []).flatMap((module) => module.lessons ?? []).reduce((total, lesson) => total + durationInMinutes(lesson.duration), 0));
             const modulesCount = Array.isArray(course.modules) ? course.modules.length : 0;
             const summary = course.summary ?? "Learn the core concepts and production patterns behind this course.";
+            const imageUrl = imageUrlFor(course.coverImage);
 
             return (
               <Link className="course-card" href={`/course/${slug}`} key={slug}>
-                <CourseIcon type={type} />
+                <CourseIcon type={type} imageUrl={imageUrl} />
                 <h3>{course.title}</h3>
                 <p>{summary}</p>
                 <div className="course-meta">
