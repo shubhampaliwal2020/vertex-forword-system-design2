@@ -22,7 +22,7 @@ export type LessonSummary = {
   slug: { current: string }
   videoUrl?: string
   thumbnail?: unknown
-  duration?: string
+  duration?: string | number
   freePreview?: boolean
   studentCount?: number
   keyPoints?: string[]
@@ -57,7 +57,7 @@ export type CourseSummary = {
   title: string
   slug: { current: string }
   summary?: string
-  duration?: string
+  duration?: string | number
   coverImage?: unknown
   level?: string
   price?: string
