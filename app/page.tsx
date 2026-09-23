@@ -96,9 +96,9 @@ export default async function Home() {
         <h1 id="hero-title">Search your learning<br />in plain English.</h1>
         <p className="hero-copy">Vertex understands what you want to learn and<br className="desktop-only" /> finds the exact lessons across all your courses.</p>
         <a className="primary-button" href="#courses">Explore Courses <ArrowRight className="arrow" aria-hidden="true" /></a>
-        <form className="search-box" role="search" action="#courses">
+        <form className="search-box" role="search" action="/search" method="get">
           <Search className="search-icon" aria-hidden="true" />
-          <input aria-label="Search your learning" placeholder="Ask anything about your learning..." />
+          <input name="q" aria-label="Search your learning" placeholder="Ask anything about your learning..." />
           <kbd><span aria-hidden="true">&#8984;</span> K</kbd>
         </form>
       </section>

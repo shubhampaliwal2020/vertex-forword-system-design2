@@ -1,7 +1,9 @@
 import Link from 'next/link'
-import { ArrowLeft, ArrowRight, Bell, BookOpenText, Clock3, Gauge, Play, Search, Sparkles, Volume2 } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Bell, BookOpenText, CheckCircle2, Clock3, Gauge, Lightbulb, Sparkles, Users } from 'lucide-react'
+import { PortableText } from 'next-sanity'
 import { getLessonBySlug } from '../../../sanity/lib/data'
 import { fallbackCourses, fallbackLessons } from '../../course/fallbackData'
+import { LessonPlayer, LessonTabs, ResourceLink } from './LessonPlayer'
 
 function VertexMark() {
   return <Sparkles className="vertex-mark" aria-hidden="true" strokeWidth={2.4} />
@@ -30,6 +32,7 @@ export default async function LessonPage({ params }: { params: Promise<{ slug: s
   const activeModuleIndex = courseModules?.findIndex((module) => module.lessons?.some((courseLesson) => courseLesson.slug.current === lesson.slug.current)) ?? 0
   const moduleCount = courseModules?.length ?? 1
   const activeLessonIndex = courseModules?.[activeModuleIndex]?.lessons?.findIndex((courseLesson) => courseLesson.slug.current === lesson.slug.current) ?? 0
+  const activeListIndex = lessonList.findIndex((item) => item.active)
   const lessonSummary = `Learn the practical concepts behind ${lesson.title} and apply them in a production-ready project.`
   const courseMark = courseSlug === 'docker-essentials' ? 'D' : courseSlug === 'typescript-deep-dive' ? 'TS' : 'N'
 
@@ -80,7 +83,7 @@ export default async function LessonPage({ params }: { params: Promise<{ slug: s
               </div>
 
               {lessonList.map((item) => (
-                <div key={item.number} className={`lesson-item ${item.active ? 'active' : ''}`}>
+                <Link href={`/lesson/${item.slug}`} key={item.slug} className={`lesson-item ${item.active ? 'active' : ''}`}>
                   <div className="lesson-item-main">
                     <span className="lesson-number">{item.label}</span>
                     <span className="lesson-label">{item.title}</span>
@@ -89,7 +92,7 @@ export default async function LessonPage({ params }: { params: Promise<{ slug: s
                     <span>{item.duration}</span>
                     {item.active ? <span className="now-playing">Now playing</span> : null}
                   </div>
-                </div>
+                </Link>
               ))}
             </div>
           </aside>
@@ -108,46 +111,29 @@ export default async function LessonPage({ params }: { params: Promise<{ slug: s
             <div className="meta-row">
               <span><Clock3 className="meta-icon" aria-hidden="true" />{lesson.duration}</span>
               <span><Gauge className="meta-icon" aria-hidden="true" />Intermediate</span>
-              <span><svg viewBox="0 0 24 24" className="meta-icon" aria-hidden="true"><path d="M12 12a4 4 0 1 0-4-4 4 4 0 0 0 4 4Zm-7 8a7 7 0 0 1 14 0" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/><circle cx="17" cy="8" r="2.5" fill="none" stroke="currentColor" strokeWidth="1.8" /></svg>{studentText}</span>
+              <span><Users className="meta-icon" aria-hidden="true" />{studentText}</span>
             </div>
 
             <div className="video-panel" aria-label="Video player">
-              <div className="player-screen">
-                <div className="player-letter">{courseMark}</div>
-              </div>
-
-              <div className="player-controls">
-                <button type="button" className="control-play" aria-label="Play or pause video"><Play size={16} fill="currentColor" /></button>
-                <span className="timecode">12:45 / 1:28:00</span>
-                <div className="progress-bar"><span style={{ width: '18%' }} /></div>
-                <div className="player-icons">
-                  <button type="button" aria-label="Mute"><Volume2 size={16} /></button>
-                  <button type="button" aria-label="Search in video"><Search size={15} /></button>
-                  <button type="button" aria-label="Settings"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 12a4 4 0 1 1 8 0 4 4 0 0 1-8 0ZM12 3v2M12 19v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M3 12h2M19 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" /></svg></button>
-                </div>
-              </div>
+              <LessonPlayer videoUrl={lesson.videoUrl} title={lesson.title} />
             </div>
 
-            <div className="tab-nav" role="tablist" aria-label="Lesson tabs">
-              <button type="button" className="tab active" role="tab" aria-selected="true">Lesson Content</button>
-              <button type="button" className="tab" role="tab" aria-selected="false">Notes</button>
-            </div>
-
-            <div className="lesson-content-panel">
-              <h2>Overview</h2>
-              <p>{lessonSummary}</p>
+            <LessonTabs
+              content={<>
+                <h2>Overview</h2>
+                <p>{lessonSummary}</p>
 
               <div className="key-points">
                 <h3>In this lesson you will:</h3>
                 <ul>
                   {keyPoints.map((point) => (
-                    <li key={point}>{point}</li>
+                    <li key={point}><CheckCircle2 aria-hidden="true" />{point}</li>
                   ))}
                 </ul>
               </div>
 
               <div className="pro-tip-box">
-                <div className="tip-badge">💡</div>
+                <div className="tip-badge"><Lightbulb aria-hidden="true" /></div>
                 <div>
                   <h3>Pro Tip</h3>
                   <p>{lesson.proTip ?? 'Use the patterns from this lesson to keep your implementation clear, reliable, and easy to maintain.'}</p>
@@ -158,30 +144,32 @@ export default async function LessonPage({ params }: { params: Promise<{ slug: s
                 <h3>Resources</h3>
                 <div className="resource-grid">
                   {resources.map((resource) => (
-                    <div key={resource.title} className="resource-card">
+                    <ResourceLink key={resource.title} url={resource.url}>
                       <div className="resource-icon"><BookOpenText size={18} /></div>
                       <div className="resource-copy">
                         <span className="resource-type">{resource.type}</span>
                         <strong>{resource.title}</strong>
                         <p>{resource.description}</p>
                       </div>
-                    </div>
+                    </ResourceLink>
                   ))}
                 </div>
               </div>
-            </div>
+              </>}
+              notes={<div className="portable-notes"><h2>Notes</h2>{lesson.notes?.length ? <PortableText value={lesson.notes as never} /> : <p>No notes have been added for this lesson yet.</p>}</div>}
+            />
 
             <div className="lesson-nav-row">
-              <Link href={lessonList[activeLessonIndex - 1] ? `/lesson/${lessonList[activeLessonIndex - 1].slug}` : `/course/${courseSlug}`} className="nav-button prev-btn">
+              <Link href={lessonList[activeListIndex - 1] ? `/lesson/${lessonList[activeListIndex - 1].slug}` : `/course/${courseSlug}`} className="nav-button prev-btn">
                 <ArrowLeft aria-hidden="true" /> Previous Lesson
               </Link>
 
               <div className="mini-course-info">
-                <span>{lessonList[activeLessonIndex + 1]?.title ?? lesson.title}</span>
-                <small>{lessonList[activeLessonIndex + 1]?.duration ?? lesson.duration ?? 'Lesson'}</small>
+                <span>{lessonList[activeListIndex + 1]?.title ?? lesson.title}</span>
+                <small>{lessonList[activeListIndex + 1]?.duration ?? lesson.duration ?? 'Lesson'}</small>
               </div>
 
-              <Link href={lessonList[activeLessonIndex + 1] ? `/lesson/${lessonList[activeLessonIndex + 1].slug}` : `/course/${courseSlug}`} className="nav-button next-btn">
+              <Link href={lessonList[activeListIndex + 1] ? `/lesson/${lessonList[activeListIndex + 1].slug}` : `/course/${courseSlug}`} className="nav-button next-btn">
                 Next Lesson <ArrowRight aria-hidden="true" />
               </Link>
             </div>
