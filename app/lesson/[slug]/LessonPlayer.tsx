@@ -30,14 +30,20 @@ function getEmbedUrl(videoUrl?: string) {
   return null
 }
 
-export function LessonPlayer({videoUrl, title}: {videoUrl?: string; title: string}) {
+export function LessonPlayer({videoUrl, title, startSeconds = 0}: {videoUrl?: string; title: string; startSeconds?: number}) {
   const embedUrl = getEmbedUrl(videoUrl)
 
   if (!embedUrl) {
     return <div className="video-unavailable"><Play size={30} aria-hidden="true" /><strong>Video unavailable</strong><span>This lesson does not have a supported streaming video yet.</span></div>
   }
 
-  return <div className="video-frame"><iframe src={`${embedUrl}?rel=0&modestbranding=1&playsinline=1`} title={`${title} lesson video`} allow="autoplay; encrypted-media; picture-in-picture" allowFullScreen /></div>
+  const playerUrl = new URL(embedUrl)
+  playerUrl.searchParams.set('rel', '0')
+  playerUrl.searchParams.set('modestbranding', '1')
+  playerUrl.searchParams.set('playsinline', '1')
+  if (Number.isFinite(startSeconds) && startSeconds > 0) playerUrl.searchParams.set('start', String(Math.floor(startSeconds)))
+
+  return <div className="video-frame"><iframe src={playerUrl.toString()} title={`${title} lesson video`} allow="autoplay; encrypted-media; picture-in-picture" allowFullScreen /></div>
 }
 
 export function LessonTabs({content, notes}: {content: React.ReactNode; notes: React.ReactNode}) {

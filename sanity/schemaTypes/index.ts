@@ -8,6 +8,7 @@ import {lessonType} from './lessonType'
 import {moduleType} from './moduleType'
 import {postType} from './postType'
 import {authorType} from './authorType'
+import {videoType} from './videoType'
 
 export const schema: { types: SchemaTypeDefinition[] } = {
   types: [
@@ -19,5 +20,6 @@ export const schema: { types: SchemaTypeDefinition[] } = {
     moduleType,
     postType,
     authorType,
+    videoType,
   ],
 }
