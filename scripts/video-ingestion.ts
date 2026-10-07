@@ -2,9 +2,12 @@ import {createHash} from 'node:crypto'
 import {readFile} from 'node:fs/promises'
 import {createClient} from 'next-sanity'
 import {YoutubeTranscript} from 'youtube-transcript'
+import {ensureUniqueArrayKeys} from './video-array-keys'
 
 export type CaptionCue = {startSeconds: number; durationSeconds?: number; text: string}
 export type Chapter = {startSeconds: number; label: string}
+export type KeyedChapter = Chapter & {_key: string}
+export type KeyedChunk = {startSeconds: number; text: string; _key: string}
 export type VideoDocument = {
   _id: string
   _type: 'video'
@@ -12,12 +15,15 @@ export type VideoDocument = {
   url: string
   provider: 'youtube'
   durationSeconds?: number
-  chapters: Chapter[]
-  chunks: Array<{startSeconds: number; text: string}>
+  chapters: KeyedChapter[]
+  chunks: KeyedChunk[]
 }
 
 type VideoMetadata = {id: string; duration?: number}
 type Lesson = {slug?: {current?: string}; videoUrl?: string}
+export type IngestionInput = {lessonSlug: string; url: string; durationSeconds?: number}
+export type VideoSource = {cues: CaptionCue[]; chapters?: Chapter[]}
+export type IngestionFailure = {lessonSlug: string; url: string; provider: string; reason: string}
 
 export function canonicalizeYouTubeUrl(value: string) {
   const url = new URL(value)
@@ -45,28 +51,79 @@ function cleanText(value: string) {
 
 export function normalizeChapters(chapters: Chapter[], durationSeconds?: number) {
   const seen = new Set<number>()
-  return chapters
+  const normalized = chapters
     .filter((chapter) => Number.isFinite(chapter.startSeconds) && chapter.startSeconds >= 0)
     .map((chapter) => ({startSeconds: Math.round(chapter.startSeconds * 100) / 100, label: cleanText(chapter.label)}))
-    .filter((chapter) => chapter.label && (!durationSeconds || chapter.startSeconds <= durationSeconds))
+    .filter((chapter) => chapter.label && (durationSeconds === undefined || chapter.startSeconds <= durationSeconds))
     .sort((a, b) => a.startSeconds - b.startSeconds)
     .filter((chapter) => !seen.has(chapter.startSeconds) && seen.add(chapter.startSeconds))
+  return ensureUniqueArrayKeys('chapter', normalized, (chapter) => chapter.label)
 }
 
 export function normalizeTranscript(cues: CaptionCue[], durationSeconds?: number) {
-  const chunks: Array<{startSeconds: number; text: string}> = []
+  const textByTimestamp = new Map<number, string[]>()
   for (const cue of cues) {
     if (!Number.isFinite(cue.startSeconds) || cue.startSeconds < 0) continue
     if (durationSeconds !== undefined && cue.startSeconds > durationSeconds) continue
     const text = cleanText(cue.text)
     if (!text) continue
     const startSeconds = Math.round(cue.startSeconds * 100) / 100
-    const previous = chunks.at(-1)
-    if (previous && startSeconds === previous.startSeconds) previous.text = cleanText(`${previous.text} ${text}`)
-    else chunks.push({startSeconds, text})
+    const texts = textByTimestamp.get(startSeconds) || []
+    texts.push(text)
+    textByTimestamp.set(startSeconds, texts)
   }
+  const chunks = [...textByTimestamp.entries()]
+    .map(([startSeconds, texts]) => ({startSeconds, text: cleanText(texts.join(' '))}))
+    .sort((a, b) => a.startSeconds - b.startSeconds)
   if (!chunks.length) throw new Error('Transcript contains no usable caption text.')
-  return chunks
+  return ensureUniqueArrayKeys('chunk', chunks, (chunk) => chunk.text)
+}
+
+function providerName(value: string) {
+  try {
+    return new URL(value).hostname.replace(/^www\./, '')
+  } catch {
+    return 'unknown provider'
+  }
+}
+
+export async function buildVideoDocuments(
+  inputs: IngestionInput[],
+  loadSource: (input: IngestionInput, sourceId: string) => Promise<VideoSource>,
+) {
+  const documents = new Map<string, VideoDocument>()
+  const failures: IngestionFailure[] = []
+
+  for (const input of inputs) {
+    try {
+      const youtube = canonicalizeYouTubeUrl(input.url)
+      if (documents.has(youtube.url)) continue
+      if (input.durationSeconds !== undefined && (!Number.isFinite(input.durationSeconds) || input.durationSeconds < 0)) {
+        throw new Error('Duration must be a finite, non-negative number.')
+      }
+      const source = await loadSource(input, youtube.sourceId)
+      const document: VideoDocument = {
+        _id: videoDocumentId(youtube.url),
+        _type: 'video',
+        sourceId: youtube.sourceId,
+        url: youtube.url,
+        provider: 'youtube',
+        durationSeconds: input.durationSeconds,
+        chapters: normalizeChapters(source.chapters || [], input.durationSeconds),
+        chunks: normalizeTranscript(source.cues, input.durationSeconds),
+      }
+      documents.set(youtube.url, document)
+    } catch (error) {
+      failures.push({
+        lessonSlug: input.lessonSlug,
+        url: input.url,
+        provider: providerName(input.url),
+        reason: error instanceof Error ? error.message : String(error),
+      })
+    }
+  }
+
+  return {documents: [...documents.values()], failures}
 }
 
 function decodeXml(value: string) {
@@ -145,20 +202,23 @@ async function loadInputs() {
   })
 }
 
-async function main() {
+export async function main() {
   const {dryRun, limit, captionsDir} = parseArgs(process.argv.slice(2))
   const inputs = (await loadInputs()).slice(0, limit || undefined)
-  const documents: VideoDocument[] = []
-  for (const input of inputs) {
-    try {
-      const youtube = canonicalizeYouTubeUrl(input.url)
-      const fixture = await readCaptionFixture(captionsDir, input.lessonSlug, youtube.sourceId)
-      const source = fixture || await fetchYouTubeSource(youtube.sourceId)
-      documents.push({_id: videoDocumentId(youtube.url), _type: 'video', sourceId: youtube.sourceId, url: youtube.url, provider: 'youtube', durationSeconds: input.durationSeconds, chapters: normalizeChapters(source.chapters || [], input.durationSeconds), chunks: normalizeTranscript(source.cues, input.durationSeconds)})
-      console.log(`${input.lessonSlug}: ${documents.at(-1)!.chunks.length} chunks, ${documents.at(-1)!.chapters.length} chapters${fixture ? ' (fixture)' : ''}`)
-    } catch (error) {
-      throw new Error(`${input.lessonSlug} (${input.url}): ${error instanceof Error ? error.message : String(error)}`)
-    }
+  const fixtureSlugs = new Set<string>()
+  const {documents, failures} = await buildVideoDocuments(inputs, async (input, sourceId) => {
+    const fixture = await readCaptionFixture(captionsDir, input.lessonSlug, sourceId)
+    if (fixture) fixtureSlugs.add(input.lessonSlug)
+    return fixture || fetchYouTubeSource(sourceId)
+  })
+  for (const failure of failures) {
+    console.error(`${failure.lessonSlug} (${failure.url}; provider ${failure.provider}): ${failure.reason}`)
+  }
+  if (failures.length) throw new Error(`${failures.length} source(s) failed; no video documents were written.`)
+  for (const document of documents) {
+    const input = inputs.find((candidate) => canonicalizeYouTubeUrl(candidate.url).url === document.url)
+    const fixtureLabel = input && fixtureSlugs.has(input.lessonSlug) ? ' (fixture)' : ''
+    console.log(`${input?.lessonSlug || document.sourceId}: ${document.chunks.length} chunks, ${document.chapters.length} chapters${fixtureLabel}`)
   }
   if (dryRun) return console.log(`Dry run complete: ${documents.length} video documents validated.`)
 

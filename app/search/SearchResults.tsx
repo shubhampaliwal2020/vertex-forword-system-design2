@@ -155,18 +155,18 @@ export default function SearchResults({initialQuery}: {initialQuery: string}) {
   useEffect(() => {
     if (!initialQuery) return
 
-    const controller = new AbortController()
-    fetch('/api/search', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({query: initialQuery}), signal: controller.signal})
+    let active = true
+    fetch('/api/search', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({query: initialQuery})})
       .then(async (response) => {
         const payload = await response.json()
         if (!response.ok) throw new Error(payload.error || 'Search failed.')
         return payload as SearchResponse
       })
-      .then(setData)
-      .catch((reason: unknown) => { if (reason instanceof DOMException && reason.name === 'AbortError') return; setError(reason instanceof Error ? reason.message : 'Search failed.') })
-      .finally(() => setLoading(false))
+      .then((payload) => { if (active) setData(payload) })
+      .catch((reason: unknown) => { if (active) setError(reason instanceof Error ? reason.message : 'Search failed.') })
+      .finally(() => { if (active) setLoading(false) })
 
-    return () => controller.abort()
+    return () => { active = false }
   }, [initialQuery])
 
   function submitSearch(event: FormEvent<HTMLFormElement>) {

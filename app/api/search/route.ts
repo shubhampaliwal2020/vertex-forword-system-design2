@@ -8,6 +8,7 @@ import { urlFor } from '@/sanity/lib/image'
 import { posthogLoggerProvider, posthogSearchLogger, posthogSpanProcessor } from '@/instrumentation'
 
 export const runtime = 'nodejs'
+const aiSearchTimeoutMs = 3000
 
 const videoResultSchema = z.object({
   type: z.literal('video'),
@@ -326,6 +327,7 @@ export async function POST(request: Request) {
           prompt: `Find all relevant Vertex learning results for: ${query.data.query}`,
           tools,
           stopWhen: stepCountIs(6),
+          abortSignal: AbortSignal.timeout(aiSearchTimeoutMs),
           runtimeContext: {
             sessionId: `search-agent-${process.pid}`,
             traceName: 'learning_content_search',

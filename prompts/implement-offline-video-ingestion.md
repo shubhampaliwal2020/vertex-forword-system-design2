@@ -1,103 +1,78 @@
-# Implement offline video ingestion
+# Harden offline video ingestion
 
 ## Goal
 
-Implement the offline video ingestion pipeline for Vertex. It must turn supported lesson video sources into Sanity `video` documents containing ordered chapter markers and short timestamped transcript chunks. The pipeline must not run in a Next.js request path and must not expose Sanity write credentials to the browser.
+Complete and verify the existing offline pipeline that turns seeded lesson video sources into Sanity `video` documents with chapter markers and timestamped transcript chunks. Keep it outside all Next.js request paths and keep write credentials server-side/offline only.
 
 ## Skills and guidance read
 
-- `sanity-best-practices`: model video metadata as structured Sanity fields, keep streaming providers external, and use server-side writes.
-- Repository guidance in `AGENTS.md`: video documents are internal lookup documents keyed by a sanitized ID derived from the video URL; chapters are preferred over transcript chunks; whole transcripts must not be returned in request-path data.
-- Existing repository conventions in `sanity/env.ts`, `sanity/lib/client.ts`, `sanity/schemaTypes/*`, `videos.json`, `seed.ndjson`, and `prompts/seed-samples-content.md`.
+- `sanity-best-practices`: use structured Sanity fields and keep streaming video on the external provider.
+- `AGENTS.md`: video documents are internal lookup records; IDs are derived from video URLs; chapters take precedence over transcript chunks; whole transcripts are not request-path results.
 
 ## Current code inspected
 
-- `videos.json` has 120 records keyed by lesson slug. Each record currently includes `id`, `title`, `channel`, `duration`, and `query`, but no transcript or chapter data.
-- `seed.ndjson` contains the lesson documents and their canonical `videoUrl` values. The object key in `videos.json` is the lesson-slug association.
-- There is no registered `video` schema type, offline script, Sanity write client, transcript parser, chapter parser, or script runner.
-- `app/api/search/route.ts` already expects video documents with `url`, `chapters`, and `chunks`, and applies chapter-first matching conceptually.
-- The current lesson player supports YouTube URLs only. Do not claim Vimeo or Bunny ingestion support unless playback and ingestion are both implemented in the same change; otherwise fail clearly for unsupported providers.
+- `scripts/video-ingestion.ts` already loads `videos.json` and lesson URLs from `seed.ndjson`, canonicalizes YouTube URLs, fetches captions and chapters, normalizes data, supports fixtures and `--dry-run`, and upserts with a Sanity transaction.
+- `scripts/video-ingestion.test.ts` covers YouTube URL canonicalization, stable IDs, caption parsing/normalization, and chapter normalization. `npm run test:ingestion` currently passes.
+- `sanity/schemaTypes/videoType.ts` defines the `video` fields and `sanity/schemaTypes/index.ts` already registers it.
+- `app/api/search/route.ts` consumes `url`, `chapters`, and `chunks`; the lesson player currently supports YouTube. Do not add Vimeo or Bunny ingestion in this task.
+- `scripts/README.md` documents the existing fixture, dry-run, and write commands.
+- `videos.json` and `seed.ndjson` are source inputs and must remain unchanged.
 
 ## Decisions and assumptions
 
-- Add a root-level `scripts/` area for offline tooling.
-- Add a `video` Sanity document schema with:
-  - `sourceId` or equivalent provider identifier
-  - canonical `url`
-  - ordered `chapters` objects containing `startSeconds` and `label`
-  - ordered `chunks` objects containing `startSeconds` and `text`
-  - only minimal optional source metadata needed for re-ingestion/debugging
-- Use a deterministic Sanity document ID derived from the canonical video URL and sanitized to Sanity's accepted ID characters. Re-running ingestion must update the same document instead of creating duplicates.
-- Resolve the source URL from the lesson data rather than trusting metadata in `videos.json`; preserve the existing source files unchanged.
-- Normalize captions into short, non-empty, ordered chunks. Merge adjacent caption cues where appropriate, but never store one whole transcript field.
-- Normalize authored/provider chapter data into clean, ordered chapter markers, removing invalid, duplicate, negative, or out-of-range entries.
-- Provide a dry-run mode that performs loading, provider parsing, normalization, and validation without writing to Sanity.
-- Use a direct development dependency and a documented npm script for running TypeScript tooling. Do not rely on an incidental transitive package.
-- Keep provider-specific fetching behind a small adapter interface so unsupported providers fail with an actionable message and do not produce partial documents.
-- For external transcript/chapter fetching, use a maintained package or documented HTTP source after checking its API and license compatibility. Keep credentials and optional API keys in environment variables, with a committed `.env.example` update if new variables are required.
-- Use a Sanity write client only in the offline script. Never import it from the app or expose its token to client code.
+- Improve the existing script and test/documentation surfaces in place; do not scaffold another ingestion architecture or add unnecessary dependencies.
+- Keep YouTube as the only supported provider. Unsupported sources must fail clearly rather than producing incomplete documents.
+- Preserve the established document fields and canonical-URL-derived deterministic ID so existing search projections remain compatible.
+- Validate the complete batch before committing anything. Collect per-source failures with lesson slug, URL, provider, and reason; any validation/fetch failure must exit non-zero and prevent writes.
+- Deduplicate repeated canonical video URLs before upsert so there is one document and one mutation per unique URL.
+- Keep dry-run independent of a Sanity write token. Do not log credentials or alter the dataset destructively.
+- Follow existing Node/TypeScript and `node:test` patterns. No Next.js runtime changes are expected.
 
 ## Expected files
 
-- `sanity/schemaTypes/videoType.ts`
-- `sanity/schemaTypes/index.ts`
-- `scripts/ingest-videos.ts`
-- `scripts/video-providers/types.ts`
-- `scripts/video-providers/<provider>.ts` for each provider actually supported
-- focused normalization/ID helpers and tests, following the repository's available test strategy
-- `package.json` and lockfile for the script/dependency entry
-- `.env.example` if the repository has one or if new environment variables are needed
-- a short operator document or README section describing setup, dry run, write run, and verification
+- `scripts/video-ingestion.ts`
+- `scripts/video-ingestion.test.ts`
+- `scripts/README.md` only if the actual command or operational behavior changes
 
-Avoid unrelated changes to UI, search ranking, or seed content.
+Do not modify schema, app UI/search behavior, `videos.json`, `seed.ndjson`, dependencies, or unrelated user changes unless inspection proves a required compatibility fix. Avoid adding files unless the existing structure cannot reasonably hold the change.
 
 ## Functional requirements
 
-1. Load the 120 source records and associate each lesson slug with its canonical lesson `videoUrl` from the seed data or Sanity, with a clear error for missing or conflicting associations.
-2. Parse and canonicalize supported YouTube URLs at minimum, including watch, short, and embed forms already recognized by the lesson player. If the existing task scope requires Vimeo or Bunny, implement their adapter and playback contract together; otherwise report them as unsupported rather than silently ingesting bad data.
-3. Fetch or accept provider chapter markers and captions through provider adapters, then normalize them into the Sanity shape.
-4. Ensure chapter and chunk arrays are sorted, timestamps are finite non-negative numbers, text/labels are trimmed and non-empty, and duplicate timestamps do not create ambiguous records.
-5. Ensure chunks remain bounded in size and preserve enough timestamps for search result deep links.
-6. Upsert one `video` document per unique canonical URL using deterministic IDs. Do not create a document for a failed or unsupported source.
-7. Support `--dry-run` and a normal write mode. Dry run should print a concise summary and actionable validation errors without requiring a write token.
-8. Make failures observable: report the lesson slug, URL, provider, and failure reason, and exit non-zero if any source fails.
-9. Keep the output compatible with the existing search route and the schema's GROQ projections.
-10. Do not modify `videos.json` or `seed.ndjson`.
+1. Resolve each configured lesson slug to its seeded lesson URL and canonicalize supported YouTube URL forms.
+2. Build schema-compatible documents containing provider/source ID, canonical URL, optional duration, sorted chapters, and sorted timestamped transcript chunks. Never store a whole transcript blob.
+3. Validate finite, non-negative timestamps; discard unusable empty text/labels; enforce duration bounds; handle duplicate timestamps without ambiguous output.
+4. Upsert exactly one deterministic Sanity document per unique canonical URL.
+5. Support fixture-based and fetched source data, `--limit`, and `--dry-run`. Dry-run must not require or use a write token.
+6. On any source failure, report actionable context and exit non-zero; never commit a partial batch.
+7. Preserve source inputs and app/runtime boundaries.
 
 ## Security and operational requirements
 
-- Read `SANITY_API_WRITE_TOKEN` only in the offline process and never log it.
-- Keep project ID, dataset, API version, and any provider credentials in environment variables.
-- Do not place transcript fetching or Sanity writes in `app/`, route handlers, client components, or build-time page rendering.
-- Do not return whole transcript/chunk arrays from request-path APIs as part of this task.
-- Avoid destructive dataset replacement by default; use deterministic upserts and require an explicit flag for any destructive behavior.
+- Read `SANITY_API_WRITE_TOKEN` only in the offline write path and never print it.
+- Read project ID, dataset, and API version from environment variables.
+- Keep fetching and Sanity writes in `scripts/`; do not import write credentials or client code into `app/`.
+- Keep upserts non-destructive and idempotent.
 
 ## Acceptance criteria
 
-- A registered Sanity `video` document type validates the required URL, chapters, and chunks shape.
-- The documented dry-run command processes the current source set without writing and validates all generated documents.
-- A write run upserts stable IDs and is idempotent when repeated.
-- Invalid timestamps, empty transcript text, missing lesson mappings, duplicate URLs, and unsupported providers fail with useful diagnostics.
-- Generated documents contain ordered chapter markers and short timestamped chunks, not a whole transcript blob.
-- At least one fixture or unit-level test covers URL canonicalization, deterministic IDs, caption/chapter normalization, and invalid input rejection.
-- `npm run lint`, `npx tsc --noEmit`, and the focused ingestion tests/check command pass.
-- The operator documentation includes required environment variables, dry-run and write commands, and a Sanity query to verify document count and shape.
+- Existing and added focused tests cover canonical URL/ID behavior, normalized chapter and chunk output, duplicate-URL batching, and failure/no-partial-write behavior where practical without live Sanity credentials.
+- Dry-run validates every requested source, reports the number of unique documents, and requires no write token.
+- A write run sends one create-or-replace mutation per canonical URL only after the entire input batch validates.
+- Output remains compatible with the registered `video` schema and the search route.
+- `npm run test:ingestion`, `npm run lint`, and `npx tsc --noEmit` pass; run the dry-run command if local fixtures or network access permit.
 
 ## Manual verification
 
-1. Install dependencies.
-2. Copy the documented environment variables into the local environment, including a Sanity write token only for the write run.
-3. Run the dry-run command and confirm it writes nothing and reports the expected source count.
-4. Run the focused tests/checks.
-5. Run the write command against a non-production or explicitly selected dataset.
-6. Query Sanity for the `video` document count, non-empty `chunks`, ordered timestamps, and unique URLs.
-7. Run the ingestion command a second time and confirm the document count does not increase.
-8. Open one lesson/search path and confirm the stored video URL and timestamp shape are compatible with existing consumers.
+1. Run the focused ingestion tests and static checks.
+2. Run a fixture-backed dry run and confirm the summary, chapter/chunk counts, and absence of Sanity writes.
+3. Run a normal ingestion only against an explicitly selected non-production dataset with a write token.
+4. Query Sanity for video document count, non-empty chunks, ordered timestamps, and unique URLs; repeat ingestion and confirm the count is stable.
+5. Confirm an ingested document's canonical URL matches the lesson URL used by the existing search query.
 
 ## Checks to run
 
+- `npm run test:ingestion`
 - `npm run lint`
 - `npx tsc --noEmit`
-- the focused ingestion test/check command
-- dry-run ingestion
-- a production build only if the schema or runtime imports require it
+- a fixture-backed `npm run ingest:videos -- --dry-run ...` when a suitable fixture exists
+- production build only if runtime/app/schema imports change
