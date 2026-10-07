@@ -1,6 +1,7 @@
 import { ClerkProvider } from "@clerk/nextjs";
 import { Poppins } from "next/font/google";
 import type { Metadata } from "next";
+import { PostHogIdentity } from "./search/SearchResults";
 import "./globals.css";
 
 const poppins = Poppins({
@@ -19,6 +20,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     <html lang="en" suppressHydrationWarning className={`h-full antialiased ${poppins.variable}`}>
       <body suppressHydrationWarning className="min-h-full flex flex-col">
         <ClerkProvider>
+          <PostHogIdentity />
           {children}
         </ClerkProvider>
       </body>

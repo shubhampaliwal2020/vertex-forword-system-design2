@@ -198,22 +198,38 @@ const categoryListQuery = `
   }
 `
 
+/** Keep public pages available when the private Sanity dataset is temporarily unreachable. */
+async function fetchWithFallback<T>(
+  query: string,
+  fallback: T,
+  params?: Record<string, string>,
+): Promise<T> {
+  try {
+    return params ? await client.fetch<T>(query, params) : await client.fetch<T>(query)
+  } catch (error) {
+    // Never log the Sanity client error object: it can contain request metadata.
+    const reason = error instanceof Error ? error.message : 'unknown error'
+    console.warn(`Sanity content unavailable; using page fallback data (${reason}).`)
+    return fallback
+  }
+}
+
 export async function getCourses(): Promise<CourseSummary[]> {
-  return client.fetch(courseListQuery)
+  return fetchWithFallback<CourseSummary[]>(courseListQuery, [])
 }
 
 export async function getCourseBySlug(slug: string): Promise<CourseSummary | null> {
-  return client.fetch(courseBySlugQuery, {slug})
+  return fetchWithFallback<CourseSummary | null>(courseBySlugQuery, null, {slug})
 }
 
 export async function getLessonBySlug(slug: string): Promise<LessonSummary | null> {
-  return client.fetch(lessonBySlugQuery, {slug})
+  return fetchWithFallback<LessonSummary | null>(lessonBySlugQuery, null, {slug})
 }
 
 export async function getInstructorBySlug(slug: string): Promise<InstructorSummary | null> {
-  return client.fetch(instructorBySlugQuery, {slug})
+  return fetchWithFallback<InstructorSummary | null>(instructorBySlugQuery, null, {slug})
 }
 
 export async function getCategories(): Promise<CategorySummary[]> {
-  return client.fetch(categoryListQuery)
+  return fetchWithFallback<CategorySummary[]>(categoryListQuery, [])
 }

@@ -9,8 +9,10 @@ function VertexMark() {
   return <Sparkles className="vertex-mark" aria-hidden="true" strokeWidth={2.4} />
 }
 
-export default async function LessonPage({ params }: { params: Promise<{ slug: string }> }) {
+export default async function LessonPage({ params, searchParams }: { params: Promise<{ slug: string }>; searchParams: Promise<{ start?: string }> }) {
   const { slug } = await params
+  const { start } = await searchParams
+  const startSeconds = start && /^\d+$/.test(start) ? Number(start) : 0
   const lesson = (await getLessonBySlug(slug)) ?? fallbackLessons[slug] ?? fallbackLessons['data-fetching-caching']
   const studentText = lesson.studentCount ? `${lesson.studentCount.toLocaleString()} students` : '3,426 students'
   const keyPoints = lesson.keyPoints ?? []
@@ -115,7 +117,7 @@ export default async function LessonPage({ params }: { params: Promise<{ slug: s
             </div>
 
             <div className="video-panel" aria-label="Video player">
-              <LessonPlayer videoUrl={lesson.videoUrl} title={lesson.title} />
+              <LessonPlayer videoUrl={lesson.videoUrl} title={lesson.title} startSeconds={startSeconds} />
             </div>
 
             <LessonTabs

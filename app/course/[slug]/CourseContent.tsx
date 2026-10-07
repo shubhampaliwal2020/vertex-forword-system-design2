@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { ChevronDown, PlayCircle } from 'lucide-react'
 import { useState } from 'react'
+import posthog from 'posthog-js'
 import type { ModuleSummary } from '../../../sanity/lib/data'
 
 function durationInMinutes(duration?: string | number) {
@@ -29,7 +30,15 @@ type CourseContentProps = {
 export default function CourseContent({modules, courseId}: CourseContentProps) {
   const [expandedModules, setExpandedModules] = useState<Set<string>>(new Set())
 
-  function toggleModule(moduleKey: string) {
+  function toggleModule(moduleKey: string, moduleIndex: number) {
+    const expanded = !expandedModules.has(moduleKey)
+    if (process.env.NEXT_PUBLIC_POSTHOG_KEY && process.env.NEXT_PUBLIC_POSTHOG_HOST) {
+      posthog.capture('course_module_toggled', {
+        course_id: courseId,
+        module_index: moduleIndex,
+        expanded,
+      })
+    }
     setExpandedModules((current) => {
       const next = new Set(current)
       if (next.has(moduleKey)) next.delete(moduleKey)
@@ -39,10 +48,12 @@ export default function CourseContent({modules, courseId}: CourseContentProps) {
   }
 
   function toggleAll() {
-    setExpandedModules((current) =>
-      current.size === modules.length
-        ? new Set()
-        : new Set(modules.map((module, index) => module._key ?? `${courseId}-${index}`)),
+    const expanded = !allExpanded
+    if (process.env.NEXT_PUBLIC_POSTHOG_KEY && process.env.NEXT_PUBLIC_POSTHOG_HOST) {
+      posthog.capture('course_content_toggled', { course_id: courseId, expanded })
+    }
+    setExpandedModules(() =>
+      expanded ? new Set(modules.map((module, index) => module._key ?? `${courseId}-${index}`)) : new Set(),
     )
   }
 
@@ -66,7 +77,7 @@ export default function CourseContent({modules, courseId}: CourseContentProps) {
                   className="module-toggle"
                   aria-expanded={isExpanded}
                   aria-controls={`module-lessons-${moduleKey}`}
-                  onClick={() => toggleModule(moduleKey)}
+                  onClick={() => toggleModule(moduleKey, index + 1)}
                 >
                   <span className="module-copy">
                     <span className="module-title">{module.title}</span>
@@ -80,7 +91,7 @@ export default function CourseContent({modules, courseId}: CourseContentProps) {
               {isExpanded && (
                 <div className="module-lessons" id={`module-lessons-${moduleKey}`}>
                   {lessons.length ? lessons.map((lesson, lessonIndex) => (
-                    <Link className="module-lesson" href={`/lesson/${lesson.slug.current}`} key={lesson._id}>
+                    <Link className="module-lesson" href={`/lesson/${lesson.slug.current}`} key={lesson._id} onClick={() => { if (process.env.NEXT_PUBLIC_POSTHOG_KEY && process.env.NEXT_PUBLIC_POSTHOG_HOST) posthog.capture('course_lesson_opened', { course_id: courseId, module_index: index + 1, lesson_index: lessonIndex + 1, lesson_slug: lesson.slug.current }) }}>
                       <span className="lesson-index">{index + 1}.{lessonIndex + 1}</span>
                       <span className="lesson-title">{lesson.title}</span>
                       <span className="lesson-duration">{lesson.duration ?? 'Lesson'}</span>

@@ -1,9 +1,14 @@
 import { createMCPClient, type MCPClient } from '@ai-sdk/mcp'
 import { openai } from '@ai-sdk/openai'
+import { SeverityNumber } from '@opentelemetry/api-logs'
 import { generateText, stepCountIs } from 'ai'
 import { z } from 'zod'
+import { client } from '@/sanity/lib/client'
+import { urlFor } from '@/sanity/lib/image'
+import { posthogLoggerProvider, posthogSearchLogger, posthogSpanProcessor } from '@/instrumentation'
 
 export const runtime = 'nodejs'
+const aiSearchTimeoutMs = 3000
 
 const videoResultSchema = z.object({
   type: z.literal('video'),
@@ -32,8 +37,59 @@ const lessonResultSchema = z.object({
 })
 
 const searchResponseSchema = z.object({
-  results: z.array(z.discriminatedUnion('type', [videoResultSchema, lessonResultSchema])).max(100),
+  results: z.array(z.discriminatedUnion('type', [videoResultSchema, lessonResultSchema])),
 })
+
+const lessonContextQuery = `
+  *[_type == "lesson" && slug.current in $lessonSlugs] {
+    _id,
+    title,
+    "slug": slug.current,
+    thumbnail,
+    duration,
+    "courses": *[_type == "course" && references(^._id)] {
+      title,
+      "slug": slug.current,
+      coverImage,
+      modules[] {
+        title,
+        "lessons": lessons[]->{_id, "slug": slug.current}
+      }
+    }
+  }
+`
+
+const sanityKeywordSearchQuery = `
+  {
+    "lessons": *[_type == "lesson" && defined(slug.current) && (
+      title match $patterns || pt::text(notes) match $patterns || keyPoints match $patterns || proTip match $patterns
+    )] {
+      title,
+      "slug": slug.current,
+      keyPoints,
+      "notesText": pt::text(notes),
+      "course": *[_type == "course" && references(^._id)][0] {
+        title,
+        "slug": slug.current
+      }
+    },
+    "videos": *[_type == "video" && (
+      count(chapters[label match $patterns]) > 0 || count(chunks[text match $patterns]) > 0
+    )] {
+      url,
+      "chapters": chapters[label match $patterns][0...5] {startSeconds, label},
+      "chunks": chunks[text match $patterns][0...5] {startSeconds, text},
+      "lesson": *[_type == "lesson" && videoUrl == ^.url][0] {
+        title,
+        "slug": slug.current,
+        "course": *[_type == "course" && references(^._id)][0] {
+          title,
+          "slug": slug.current
+        }
+      }
+    }
+  }
+`
 
 let cachedInitialContext: string | null = null
 let initialContextTimestamp = 0
@@ -64,8 +120,157 @@ function parseModelJson(text: string) {
   return searchResponseSchema.parse(JSON.parse(cleanText))
 }
 
-function formatCourseCount(results: Array<z.infer<typeof videoResultSchema> | z.infer<typeof lessonResultSchema>>) {
-  return new Set(results.map((result) => result.courseSlug)).size
+function formatTimestamp(seconds: number) {
+  const safeSeconds = Math.max(0, Math.floor(seconds))
+  return `${Math.floor(safeSeconds / 60)}:${String(safeSeconds % 60).padStart(2, '0')}`
+}
+
+function imageUrl(source: unknown) {
+  if (!source) return undefined
+  try {
+    return urlFor(source as Parameters<typeof urlFor>[0]).width(640).height(360).fit('crop').url()
+  } catch {
+    return undefined
+  }
+}
+
+async function hydrateResults(results: Array<z.infer<typeof videoResultSchema> | z.infer<typeof lessonResultSchema>>) {
+  const lessonSlugs = [...new Set(results.map((result) => result.lessonSlug))]
+  if (!lessonSlugs.length) return []
+
+  const lessons = await client.fetch<Array<{
+    _id: string
+    title: string
+    slug: string
+    thumbnail?: unknown
+    duration?: string
+    courses?: Array<{
+      title: string
+      slug: string
+      coverImage?: unknown
+      modules?: Array<{title?: string; lessons?: Array<{_id: string; slug: string} | null>}>
+    }>
+  }>>(lessonContextQuery, {lessonSlugs})
+  const lessonBySlug = new Map(lessons.map((lesson) => [lesson.slug, lesson]))
+
+  return results.flatMap((result) => {
+    const lesson = lessonBySlug.get(result.lessonSlug)
+    const course = lesson?.courses?.find((item) => item.slug === result.courseSlug)
+    if (!lesson || !course) return []
+
+    const moduleIndex = course.modules?.findIndex((module) => module.lessons?.some((item) => item?._id === lesson._id)) ?? -1
+    const matchedModule = moduleIndex >= 0 ? course.modules?.[moduleIndex] : undefined
+    const lessonIndex = matchedModule?.lessons?.findIndex((item) => item?._id === lesson._id) ?? -1
+    if (!matchedModule || moduleIndex < 0 || lessonIndex < 0) return []
+
+    const moduleTitle = matchedModule.title || result.moduleLabel
+    const lessonNumber = `${moduleIndex + 1}.${lessonIndex + 1}`
+    const thumbnailUrl = imageUrl(lesson.thumbnail) || imageUrl(course.coverImage)
+    const canonical = {
+      ...result,
+      id: `${result.type}:${lesson.slug}:${result.type === 'video' ? result.startSeconds : 'lesson'}`,
+      lessonTitle: lesson.title,
+      courseTitle: course.title,
+      moduleLabel: moduleTitle,
+      moduleTitle,
+      lessonNumber,
+      ...(thumbnailUrl ? {thumbnailUrl} : {}),
+    }
+
+    if (result.type === 'video') {
+      return [{...canonical, duration: lesson.duration || result.duration, timestampLabel: formatTimestamp(result.startSeconds)}]
+    }
+    return [canonical]
+  })
+}
+
+function keywordScore(queryTerms: string[], values: Array<string | undefined>) {
+  const title = (values[0] || '').toLowerCase()
+  const searchable = values.filter(Boolean).join(' ').toLowerCase()
+  const exactTitle = queryTerms.length > 1 && title.includes(queryTerms.join(' '))
+  return queryTerms.reduce((score, term) => {
+    if (title.split(/[^a-z0-9]+/).includes(term)) return score + 8
+    if (title.includes(term)) return score + 5
+    return searchable.includes(term) ? score + 1 : score
+  }, exactTitle ? 12 : 0)
+}
+
+async function searchSanityKeywords(query: string) {
+  const queryTerms = [...new Set(query.toLowerCase().split(/[^a-z0-9]+/).filter((term) => term.length > 1))]
+  if (!queryTerms.length) return []
+
+  const patterns = queryTerms.map((term) => `${term}*`)
+  const content = await client.fetch<{
+    lessons: Array<{
+      title: string
+      slug: string
+      keyPoints?: string[]
+      notesText?: string
+      course?: {title: string; slug: string}
+    }>
+    videos: Array<{
+      url: string
+      chapters?: Array<{startSeconds: number; label: string}>
+      chunks?: Array<{startSeconds: number; text: string}>
+      lesson?: {title: string; slug: string; course?: {title: string; slug: string}}
+    }>
+  }>(sanityKeywordSearchQuery, {patterns})
+
+  const results: Array<{
+    rank: number
+    result: z.infer<typeof videoResultSchema> | z.infer<typeof lessonResultSchema>
+  }> = []
+
+  for (const lesson of content.lessons || []) {
+    if (!lesson.course?.slug || !lesson.slug) continue
+    const keyPoints = (lesson.keyPoints || []).slice(0, 6)
+    results.push({
+      rank: keywordScore(queryTerms, [lesson.title, ...keyPoints, lesson.notesText]),
+      result: {
+        type: 'lesson',
+        id: `lesson:${lesson.slug}`,
+        lessonSlug: lesson.slug,
+        lessonTitle: lesson.title,
+        courseSlug: lesson.course.slug,
+        courseTitle: lesson.course.title,
+        moduleLabel: lesson.course.title,
+        description: (keyPoints[0] || lesson.notesText || lesson.title).slice(0, 220),
+        keyPoints,
+      },
+    })
+  }
+
+  for (const video of content.videos || []) {
+    const lesson = video.lesson
+    if (!lesson?.slug || !lesson.course?.slug) continue
+    // Chapter labels are the table of contents. Transcript chunks are used only
+    // when this video has no matching chapter.
+    const moments = video.chapters?.length
+      ? video.chapters.map((chapter) => ({startSeconds: chapter.startSeconds, text: chapter.label}))
+      : (video.chunks || []).map((chunk) => ({startSeconds: chunk.startSeconds, text: chunk.text}))
+
+    for (const moment of moments) {
+      const startSeconds = Math.max(0, Math.floor(moment.startSeconds))
+      results.push({
+        rank: keywordScore(queryTerms, [lesson.title, moment.text]) + 2,
+        result: {
+          type: 'video',
+          id: `video:${lesson.slug}:${startSeconds}`,
+          lessonSlug: lesson.slug,
+          lessonTitle: lesson.title,
+          courseSlug: lesson.course.slug,
+          courseTitle: lesson.course.title,
+          moduleLabel: lesson.course.title,
+          description: moment.text.slice(0, 220),
+          startSeconds,
+          timestampLabel: formatTimestamp(startSeconds),
+        },
+      })
+    }
+  }
+
+  results.sort((left, right) => right.rank - left.rank)
+  return results.map(({result}) => result)
 }
 
 const systemPrompt = `You are Vertex Search, a grounded learning-content search agent.
@@ -97,41 +302,80 @@ export async function POST(request: Request) {
   const token = process.env.SANITY_API_READ_TOKEN
   const openAiKey = process.env.OPENAI_API_KEY
 
-  if (!mcpUrl || !token || !openAiKey) {
-    return Response.json({error: 'Search is not configured. Add the Sanity Context and OpenAI server environment variables.'}, {status: 503})
+  if (!token) {
+    return Response.json({error: 'Search is not configured. Add the server-side Sanity read token.'}, {status: 503})
   }
 
   let mcpClient: MCPClient | null = null
 
   try {
-    const [client, initialContext] = await Promise.all([
-      createMCPClient({transport: {type: 'http', url: mcpUrl, headers: {Authorization: `Bearer ${token}`}}}),
-      getInitialContext(mcpUrl, token),
-    ])
-    mcpClient = client
-    const allTools = await mcpClient.tools()
-    const tools = Object.fromEntries(Object.entries(allTools).filter(([name]) => name !== 'initial_context'))
+    let candidateResults: Array<z.infer<typeof videoResultSchema> | z.infer<typeof lessonResultSchema>>
+    let searchMethod = 'sanity_keyword'
 
-    const result = await generateText({
-      model: openai(process.env.OPENAI_MODEL || 'gpt-4o-mini'),
-      system: `${systemPrompt}\n\nSchema context:\n${initialContext || 'Use the available MCP schema tools to inspect the content model.'}`,
-      prompt: `Find all relevant Vertex learning results for: ${query.data.query}`,
-      tools,
-      stopWhen: stepCountIs(6),
+    if (mcpUrl && openAiKey) {
+      try {
+        const [connectedClient, initialContext] = await Promise.all([
+          createMCPClient({transport: {type: 'http', url: mcpUrl, headers: {Authorization: `Bearer ${token}`}}}),
+          getInitialContext(mcpUrl, token),
+        ])
+        mcpClient = connectedClient
+        const allTools = await mcpClient.tools()
+        const tools = Object.fromEntries(Object.entries(allTools).filter(([name]) => name !== 'initial_context'))
+        const result = await generateText({
+          model: openai(process.env.OPENAI_MODEL || 'gpt-4o-mini'),
+          system: `${systemPrompt}\n\nSchema context:\n${initialContext || 'Use the available MCP schema tools to inspect the content model.'}`,
+          prompt: `Find all relevant Vertex learning results for: ${query.data.query}`,
+          tools,
+          stopWhen: stepCountIs(6),
+          abortSignal: AbortSignal.timeout(aiSearchTimeoutMs),
+          runtimeContext: {
+            sessionId: `search-agent-${process.pid}`,
+            traceName: 'learning_content_search',
+            properties: {environment: process.env.NODE_ENV},
+          },
+          telemetry: {
+            functionId: 'learning_content_search',
+            includeRuntimeContext: {sessionId: true, traceName: true, properties: true},
+            recordInputs: true,
+            recordOutputs: true,
+          },
+        })
+        candidateResults = parseModelJson(result.text).results
+        searchMethod = 'ai_mcp'
+      } catch (error) {
+        console.warn('Context search unavailable; using Sanity keyword search:', error instanceof Error ? error.message : 'Unknown search error')
+        searchMethod = 'sanity_keyword_fallback'
+        posthogSearchLogger?.emit({
+          body: 'search_ai_fallback_used',
+          severityNumber: SeverityNumber.WARN,
+          attributes: {search_method: searchMethod, error_type: error instanceof Error ? error.name : 'unknown_error'},
+        })
+        candidateResults = await searchSanityKeywords(query.data.query)
+      }
+    } else {
+      candidateResults = await searchSanityKeywords(query.data.query)
+    }
+
+    const hydratedResults = await hydrateResults(candidateResults)
+    const courses = new Set(hydratedResults.map((item) => item.courseSlug)).size
+    posthogSearchLogger?.emit({
+      body: 'search_request_completed',
+      severityNumber: SeverityNumber.INFO,
+      attributes: {search_method: searchMethod, result_count: hydratedResults.length, course_count: courses},
     })
-
-    const parsed = parseModelJson(result.text)
-    const courses = formatCourseCount(parsed.results)
-    return Response.json({query: query.data.query, total: parsed.results.length, courseCount: courses, results: parsed.results})
+    return Response.json({query: query.data.query, total: hydratedResults.length, courseCount: courses, results: hydratedResults})
   } catch (error) {
-  const message = error instanceof Error ? error.message : 'Search failed.'
-  console.error('SEARCH API ERROR:', error)
-
-  return Response.json(
-    { error: message },
-    { status: 502 }
-  )
+    const message = error instanceof Error ? error.message : 'Search failed.'
+    console.error('SEARCH API ERROR:', error instanceof Error ? `${error.name}: ${message}` : 'Unknown search error')
+    posthogSearchLogger?.emit({
+      body: 'search_request_failed',
+      severityNumber: SeverityNumber.ERROR,
+      attributes: {error_type: error instanceof Error ? error.name : 'unknown_error'},
+    })
+    return Response.json({error: message}, {status: 502})
   } finally {
     await mcpClient?.close()
+    await posthogSpanProcessor?.forceFlush()
+    await posthogLoggerProvider?.forceFlush()
   }
 }

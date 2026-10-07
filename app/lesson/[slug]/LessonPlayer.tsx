@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { ExternalLink, Play } from 'lucide-react'
+import posthog from 'posthog-js'
 
 function getEmbedUrl(videoUrl?: string) {
   if (!videoUrl) return null
@@ -30,23 +31,36 @@ function getEmbedUrl(videoUrl?: string) {
   return null
 }
 
-export function LessonPlayer({videoUrl, title}: {videoUrl?: string; title: string}) {
+export function LessonPlayer({videoUrl, title, startSeconds = 0}: {videoUrl?: string; title: string; startSeconds?: number}) {
   const embedUrl = getEmbedUrl(videoUrl)
 
   if (!embedUrl) {
     return <div className="video-unavailable"><Play size={30} aria-hidden="true" /><strong>Video unavailable</strong><span>This lesson does not have a supported streaming video yet.</span></div>
   }
 
-  return <div className="video-frame"><iframe src={`${embedUrl}?rel=0&modestbranding=1&playsinline=1`} title={`${title} lesson video`} allow="autoplay; encrypted-media; picture-in-picture" allowFullScreen /></div>
+  const playerUrl = new URL(embedUrl)
+  playerUrl.searchParams.set('rel', '0')
+  playerUrl.searchParams.set('modestbranding', '1')
+  playerUrl.searchParams.set('playsinline', '1')
+  if (Number.isFinite(startSeconds) && startSeconds > 0) playerUrl.searchParams.set('start', String(Math.floor(startSeconds)))
+
+  return <div className="video-frame"><iframe src={playerUrl.toString()} title={`${title} lesson video`} allow="autoplay; encrypted-media; picture-in-picture" allowFullScreen /></div>
 }
 
 export function LessonTabs({content, notes}: {content: React.ReactNode; notes: React.ReactNode}) {
   const [activeTab, setActiveTab] = useState<'content' | 'notes'>('content')
 
+  function selectTab(tab: 'content' | 'notes') {
+    setActiveTab(tab)
+    if (process.env.NEXT_PUBLIC_POSTHOG_KEY && process.env.NEXT_PUBLIC_POSTHOG_HOST) {
+      posthog.capture('lesson_tab_selected', { tab })
+    }
+  }
+
   return <>
     <div className="tab-nav" role="tablist" aria-label="Lesson tabs">
-      <button type="button" className={`tab ${activeTab === 'content' ? 'active' : ''}`} role="tab" aria-selected={activeTab === 'content'} onClick={() => setActiveTab('content')}>Lesson Content</button>
-      <button type="button" className={`tab ${activeTab === 'notes' ? 'active' : ''}`} role="tab" aria-selected={activeTab === 'notes'} onClick={() => setActiveTab('notes')}>Notes</button>
+      <button type="button" className={`tab ${activeTab === 'content' ? 'active' : ''}`} role="tab" aria-selected={activeTab === 'content'} onClick={() => selectTab('content')}>Lesson Content</button>
+      <button type="button" className={`tab ${activeTab === 'notes' ? 'active' : ''}`} role="tab" aria-selected={activeTab === 'notes'} onClick={() => selectTab('notes')}>Notes</button>
     </div>
     <div className="lesson-content-panel">{activeTab === 'content' ? content : notes}</div>
   </>
@@ -54,5 +68,5 @@ export function LessonTabs({content, notes}: {content: React.ReactNode; notes: R
 
 export function ResourceLink({url, children}: {url?: string; children: React.ReactNode}) {
   if (!url) return <div className="resource-card">{children}</div>
-  return <a className="resource-card" href={url} target="_blank" rel="noreferrer noopener">{children}<ExternalLink className="resource-link-icon" size={15} aria-hidden="true" /></a>
+  return <a className="resource-card" href={url} target="_blank" rel="noreferrer noopener" onClick={() => { if (process.env.NEXT_PUBLIC_POSTHOG_KEY && process.env.NEXT_PUBLIC_POSTHOG_HOST) posthog.capture('lesson_resource_opened') }}>{children}<ExternalLink className="resource-link-icon" size={15} aria-hidden="true" /></a>
 }
